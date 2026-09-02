@@ -14,10 +14,10 @@ public class NetClient : MonoBehaviour
     Thread recvThread;
     volatile bool running = true;
 
-    // clients¿¡ ½º·¹µå ÇÏ³ª¸¸ Á¢±ÙÇÒ ¼ö ÀÖµµ·Ï ¶ô »ý¼º
+    // clientsï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ï³ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Öµï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     readonly object clientsLock = new object();
 
-    // °ÔÀÓ ¿ÀºêÁ§Æ®µé 
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ 
     Dictionary<int, GameObject> objects = new();
 
     struct Client
@@ -33,12 +33,12 @@ public class NetClient : MonoBehaviour
     };
     Dictionary<int, Client> clients = new();
 
-    // ºò¿£µð¾È ÇïÆÛ (C++ get_u16/get_u32 ±×´ë·Î)
+    // ï¿½ò¿£µï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (C++ get_u16/get_u32 ï¿½×´ï¿½ï¿½)
     ushort GetU16(byte[] b, int off) => (ushort)((b[off] << 8) | b[off + 1]);
     uint GetU32(byte[] b, int off) =>
         (uint)((b[off] << 24) | (b[off + 1] << 16) | (b[off + 2] << 8) | b[off + 3]);
 
-    // Àü¼Û ¸Þ¼­µå
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½Þ¼ï¿½ï¿½ï¿½
     void SendMove(sbyte dx, sbyte dy)
     {
         byte[] pkt = new byte[6];
@@ -46,7 +46,7 @@ public class NetClient : MonoBehaviour
         pkt[2] = 0; pkt[3] = 2; // type = 2 (PKT_MOVE)
         pkt[4] = (byte)dx;
         pkt[5] = (byte)dy;
-        stream.Write(pkt, 0, 6); // ¸ÞÀÎ½º·¹µå write, ¹é±×¶ó¿îµå read¿Í µ¿½Ã OK
+        stream.Write(pkt, 0, 6); // ï¿½ï¿½ï¿½Î½ï¿½ï¿½ï¿½ï¿½ï¿½ write, ï¿½ï¿½×¶ï¿½ï¿½ï¿½ readï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ OK
     }
 
     void Start()
@@ -56,20 +56,20 @@ public class NetClient : MonoBehaviour
         stream = client.GetStream();
         recvThread = new Thread(RecvLoop);
         recvThread.Start();
-        Debug.Log("¼­¹ö Á¢¼Ó ¼º°ø, ¼ö½Å ½ÃÀÛ");
+        Debug.Log("ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½");
     }
 
     void RecvLoop()
     {
-        var recvBuf = new List<byte>();   // C++ÀÇ recv_buf
+        var recvBuf = new List<byte>();   // C++ï¿½ï¿½ recv_buf
         byte[] buf = new byte[4096];
         while (running)
         {
-            int cnt = stream.Read(buf, 0, buf.Length);   // ºí·ÎÅ· read (¿©±ä ¹é±×¶ó¿îµå¶ó OK)
+            int cnt = stream.Read(buf, 0, buf.Length);   // ï¿½ï¿½ï¿½ï¿½Å· read (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½×¶ï¿½ï¿½ï¿½ï¿½ OK)
             if (cnt <= 0) break;
             for (int i = 0; i < cnt; i++) recvBuf.Add(buf[i]);   // append
 
-            // ÇÁ·¹ÀÓ ÃßÃâ
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             while (true)
             {
                 if (recvBuf.Count < 4) break;
@@ -77,36 +77,47 @@ public class NetClient : MonoBehaviour
                 if (recvBuf.Count < (4 + length)) break;
                 UInt16 type = GetU16(recvBuf.ToArray(), 2);
 
-                Debug.Log("frame len=" + length);
-
                 byte[] payload = new byte[length];
                 Array.Copy(recvBuf.ToArray(), 4, payload, 0, length);
                 recvBuf.RemoveRange(0, 4 + length);
 
-                if (type == 3)
+                if (type == 4) // type:4 - PKT_DELTA 
                 {
                     lock (clientsLock)
                     {
-                        clients.Clear();
-                        int clientCnt = GetU16(payload.ToArray(), 0);
+                        int off = 0; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-                        for (int i = 0; i < clientCnt; i++)
+                        // removed ï¿½ï¿½È¹
+                        int removedCnt = GetU16(payload, off);
+                        off += 2;
+                        for (int i = 0; i < removedCnt; i++)
                         {
-                            int j = 3 * i;
-                            int id = (int)GetU32(payload, 4 * j + 2);
-                            int x = (int)GetU32(payload, 4 * (j + 1) + 2);
-                            int y = (int)GetU32(payload, 4 * (j + 2) + 2);
-
-                            clients[id] = new Client(x, y);
+                            int id = (int)GetU32(payload, off);
+                            off += 4;
+                            clients.Remove(id);
                         }
-                        Debug.Log("clients=" + clients.Count);
+
+                        // changed ï¿½ï¿½È¹
+                        int changedCnt = GetU16(payload, off);
+                        off += 2;
+                        for (int i = 0; i < changedCnt; i++)
+                        {
+                            int id = (int)GetU32(payload, off);
+                            off += 4;
+                            int x = (int)GetU32(payload, off);
+                            off += 4;
+                            int y = (int)GetU32(payload, off);
+                            off += 4;
+
+                            clients[id] = new Client(x, y); // ï¿½ß°ï¿½ or ï¿½ï¿½ï¿½ï¿½
+                        }
                     }
                 }
             }
         }
     }
 
-    void OnDestroy()   // Play ¸ØÃâ ¶§ ½º·¹µå/¼ÒÄÏ Á¤¸® (C++ÀÇ close + join)
+    void OnDestroy()   // Play ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (C++ï¿½ï¿½ close + join)
     {
         running = false;
         stream?.Close();
@@ -114,18 +125,18 @@ public class NetClient : MonoBehaviour
         recvThread?.Join();
     }
 
-    // ¸ÞÀÎ ½º·¹µå¿¡¼­ ¸Å ÇÁ·¹ÀÓ ½ÇÇà - °ÔÀÓ¿ÀºêÁ§Æ®´Â ¿©±â¼­¸¸ ´Ù·ïÁü.
-    // ¸Å ÇÁ·¹ÀÓ ¹ÝÀÀÇÒ °Í + ¿ÀºêÁ§Æ® ¸¸Áö´Â °ÍÀÌ ÀÌ ¸Þ¼­µå¿¡ ±¸Çö.
-    // Å¬¶óÀÌ¾ðÆ® ÀÌº¥Æ®´Â Update ¸Þ¼­µå¿¡¼­ ±¸ÇöµÇÁö¸¸, ºí·ÎÅ· read(³×Æ®¿öÅ© ¼ö½Å)°¡ ÀÌ°÷¿¡ ¼±¾ðµÇ¾î ÀÖÀ¸¸é È­¸éÀÌ ¾ó¾î¹ö¸°´Ù.
-    // ¶§¹®¿¡ ¹é±×¶ó¿îµå ½º·¹µå(RecvLoop)¿¡ ±¸ÇöÇØ³õÀ½ 
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½å¿¡ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ - ï¿½ï¿½ï¿½Ó¿ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½â¼­ï¿½ï¿½ ï¿½Ù·ï¿½ï¿½ï¿½.
+    // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ + ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Þ¼ï¿½ï¿½å¿¡ ï¿½ï¿½ï¿½ï¿½.
+    // Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ® ï¿½Ìºï¿½Æ®ï¿½ï¿½ Update ï¿½Þ¼ï¿½ï¿½å¿¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½Å· read(ï¿½ï¿½Æ®ï¿½ï¿½Å© ï¿½ï¿½ï¿½ï¿½)ï¿½ï¿½ ï¿½Ì°ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ç¾ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È­ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½.
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½×¶ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½(RecvLoop)ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ø³ï¿½ï¿½ï¿½ 
     private void Update()
     {
-        // Å°º¸µå ÀÔ·Â -> ÀÌµ¿ Àü¼Û
+        // Å°ï¿½ï¿½ï¿½ï¿½ ï¿½Ô·ï¿½ -> ï¿½Ìµï¿½ ï¿½ï¿½ï¿½ï¿½
         var kb = Keyboard.current;
         if (kb != null)
         {
             sbyte dx = 0, dy = 0;
-            if (kb.wKey.wasPressedThisFrame) dy = -1; // ¼­¹ö ÁÂÇ¥ »ó y´Â ¾Æ·¡·Î °¥¼ö·Ï Ä¿Áö´Â °ÍÀÌ´Ù. ÇØ¼­ w ´©¸£¸é -1ÀÓ.
+            if (kb.wKey.wasPressedThisFrame) dy = -1; // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ç¥ ï¿½ï¿½ yï¿½ï¿½ ï¿½Æ·ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Ä¿ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ì´ï¿½. ï¿½Ø¼ï¿½ w ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ -1ï¿½ï¿½.
             else if (kb.sKey.wasPressedThisFrame) dy = 1;
             else if (kb.aKey.wasPressedThisFrame) dx = -1;
             else if (kb.dKey.wasPressedThisFrame) dx = 1;
@@ -133,31 +144,29 @@ public class NetClient : MonoBehaviour
         }
 
         lock (clientsLock) { 
-            // ½º³À¼¦¿¡ ÀÖ´Â ÇÃ·¹ÀÌ¾î: ¿ÀºêÁ§Æ® ¾øÀ¸¸é ¸¸µé°í, À§Ä¡ °»½Å
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö´ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½
             foreach (var kv in clients)
             {
                 int id = kv.Key;
                 if (!objects.ContainsKey(id))
                 {
-                    objects[id] = GameObject.CreatePrimitive(PrimitiveType.Cube); // »õ ¿ÀºêÁ§Æ®(Å¥ºê) »ý¼º
-                    Debug.Log("cube »ý¼º id=" + id);
+                    objects[id] = GameObject.CreatePrimitive(PrimitiveType.Cube); // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®(Å¥ï¿½ï¿½) ï¿½ï¿½ï¿½ï¿½
                 }
 
-                // ¼­¹ö ÁÂÇ¥(0~100) -> È­¸é ÁÂÇ¥. ¿ùµå Áß½É(50, 50)À» È­¸é °¡¿îµ¥·Î, 0.1¹è Ãà¼Ò
+                // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ç¥(0~100) -> È­ï¿½ï¿½ ï¿½ï¿½Ç¥. ï¿½ï¿½ï¿½ï¿½ ï¿½ß½ï¿½(50, 50)ï¿½ï¿½ È­ï¿½ï¿½ ï¿½ï¿½ï¿½îµ¥ï¿½ï¿½, 0.1ï¿½ï¿½ ï¿½ï¿½ï¿½
                 float px = (kv.Value.x - 50) * 0.1f;
-                float py = -(kv.Value.y - 50) * 0.1f; // ¼­¹ö´Â ¾Æ·¡°¡ +y, Unity´Â À§°¡ +y¶ó¼­ ºÎÈ£ ¹ÝÀü ÇÊ¿ä 
+                float py = -(kv.Value.y - 50) * 0.1f; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Æ·ï¿½ï¿½ï¿½ +y, Unityï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ +yï¿½ï¿½ ï¿½ï¿½È£ ï¿½ï¿½ï¿½ï¿½ ï¿½Ê¿ï¿½ 
 
                 objects[id].transform.position = new Vector3(px, py, 0);
             }
 
-            // ½º³À¼¦¿¡¼­ »ç¶óÁø ÇÃ·¹ÀÌ¾î(³ª°¨): ¿ÀºêÁ§Æ® Á¦°Å
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½(ï¿½ï¿½ï¿½ï¿½): ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½
             var gone = objects.Keys.Where(id => !clients.ContainsKey(id)).ToList();
             foreach (var id in gone)
             {
                 Destroy(objects[id]);
                 objects.Remove(id);
             }
-            Debug.Log("objects=" + objects.Count);
         }
     }
 }
